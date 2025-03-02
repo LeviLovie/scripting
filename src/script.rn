@@ -1,17 +1,41 @@
-pub fn start() {
-    let data = new_data();
-    data.target_fps = 60;
-    return data;
+struct LocalData {
+    update_counter,
 }
 
-pub fn update(data) {
-    data.window_size = (data.window_size.0 + 1, data.window_size.1 + 1);
-    if data.window_size.0 > 1200 || data.window_size.1 > 800 {
-        data.window_size = (0, 0);
+impl LocalData {
+    pub fn new() {
+        return LocalData {
+            update_counter: 0
+        };
     }
-    data.target_fps = data.target_fps + 1;
-    if data.target_fps > 2025 {
-        data.exit = true;
+
+    pub fn inc(self) {
+        self.update_counter += 1;
     }
-    return data;
+
+    pub fn get_update_counter(self) {
+        return self.update_counter;
+    }
+
+    pub fn clear(self) {
+        self.update_counter = 0;
+    }
 }
+
+pub fn start() {
+    let data = Data::new();
+    data.target_fps = 60;
+    let local_data = LocalData::new();
+    return (data, local_data);
+}
+
+pub fn update(data, local_data) {
+    data.window_size = (data.window_size.0 + 1, data.window_size.1 + 1);
+    local_data.inc();
+    if local_data.get_update_counter() > 100 {
+        data.window_size = (800, 600);
+        local_data.clear();
+    }
+    return (data, local_data);
+}
+

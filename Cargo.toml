@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 rune = "0.13.4"
+sdl2 = "0.37.0"

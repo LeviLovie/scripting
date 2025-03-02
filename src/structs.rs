@@ -19,6 +19,7 @@ pub struct Data {
 }
 
 impl Data {
+    #[rune::function(path = Self::new)]
     pub fn new() -> Self {
         Self {
             delta: 0,
@@ -30,14 +31,9 @@ impl Data {
     }
 }
 
-#[rune::function]
-fn new_data() -> Data {
-    Data::new()
-}
-
 pub fn module() -> Result<Module, ContextError> {
     let mut module = Module::new();
     module.ty::<Data>()?;
-    module.function_meta(new_data)?;
+    module.function_meta(Data::new)?;
     Ok(module)
 }

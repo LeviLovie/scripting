@@ -1,10 +1,31 @@
 mod structs;
 
 use rune::termcolor::{ColorChoice, StandardStream};
-use rune::{Context, ContextError, Diagnostics, Module, Source, Sources, Vm};
-use std::{sync::Arc, time::Instant};
+use rune::{Context, ContextError, Diagnostics, Module, Source, Sources, Value, Vm};
+use sdl2::{event::Event, keyboard::Keycode, pixels::Color};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
+    let sdl_context = sdl2::init()?;
+    let video_subsystem = sdl_context.video()?;
+
+    let window = video_subsystem
+        .window("rust-sdl2 demo: Video", 800, 600)
+        .position_centered()
+        .opengl()
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
+
+    canvas.set_draw_color(Color::RGB(255, 0, 0));
+    canvas.clear();
+    canvas.present();
+    let mut event_pump = sdl_context.event_pump()?;
+
     let init_instant = Instant::now();
 
     // VM
@@ -38,27 +59,56 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut vm = Vm::new(runtime, Arc::new(unit));
 
     let init_elapsed = init_instant.elapsed();
-    let run_instant = Instant::now();
 
     // Call the start function
     let output = vm.call(["start"], ())?;
-    let mut data: structs::Data = rune::from_value(output)?;
-    println!("Start output: {:?}", data.clone());
-
-    loop {
-        // Call the update function
-        let output = vm.call(["update"], (data,))?;
-        data = rune::from_value(output)?;
-        println!("Update output: {:?}", data.clone());
-        if data.exit {
-            break;
-        }
-    }
-
-    let run_elapsed = run_instant.elapsed();
-
+    let mut data: structs::Data;
+    let mut local_data: Value;
+    (data, local_data) = rune::from_value(output)?;
+    println!("Start output: ({:?}, {:?})", data, local_data);
     println!("Initialization time: {}us", init_elapsed.as_micros());
-    println!("Run time (1000 executions): {}us", run_elapsed.as_micros());
+
+    let mut update_times = vec![];
+
+    'running: loop {
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => break 'running,
+                _ => {}
+            }
+        }
+
+        canvas.clear();
+        canvas.present();
+        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / data.target_fps));
+
+        let update_instant = Instant::now();
+        let output = vm.call(["update"], (data, local_data))?;
+        (data, local_data) = rune::from_value(output)?;
+        let update_elapsed = update_instant.elapsed();
+        update_times.push(update_elapsed);
+        if update_times.len() > 100 {
+            update_times.remove(0);
+        }
+        println!(
+            "Update output (.1): {:?}. In {}us ({}us)",
+            local_data,
+            update_elapsed.as_micros(),
+            update_times.iter().map(|x| x.as_micros()).sum::<u128>() / update_times.len() as u128
+        );
+        if data.exit {
+            break 'running;
+        }
+
+        // Adjust the window size
+        canvas
+            .window_mut()
+            .set_size(data.window_size.0, data.window_size.1)?;
+    }
 
     Ok(())
 }
