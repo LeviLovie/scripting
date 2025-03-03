@@ -6,8 +6,8 @@ impl LocalData {
     pub fn new() {
         return LocalData {
             update_counter: 0
-        };
-    }
+        }
+   }
 
     pub fn inc(self) {
         self.update_counter += 1;
@@ -22,20 +22,23 @@ impl LocalData {
     }
 }
 
-pub fn start() {
-    let data = Data::new();
+const LOCAL_DATA = 0;
+
+pub fn start(data) {
     data.target_fps = 60;
-    let local_data = LocalData::new();
-    return (data, local_data);
+    create_global(LOCAL_DATA, LocalData::new());
 }
 
-pub fn update(data, local_data) {
-    data.window_size = (data.window_size.0 + 1, data.window_size.1 + 1);
+pub fn update(data) {
+    let local_data = get_global(LOCAL_DATA);
+    
     local_data.inc();
     if local_data.get_update_counter() > 100 {
-        data.window_size = (800, 600);
         local_data.clear();
     }
-    return (data, local_data);
+
+    dbg!(`LocalData.counter: ${local_data.update_counter}, target: ${data.target_fps}, fps: ${data.fps}, delta: ${data.delta}, busy_delta: ${data.busy_delta}, rune_delta: ${data.rune_delta}`);
+
+    set_global(LOCAL_DATA, local_data);
 }
 

@@ -61,15 +61,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let init_elapsed = init_instant.elapsed();
 
     // Call the start function
-    let output = vm.call(["start"], ())?;
-    let mut data: structs::Data;
-    let mut local_data: Value;
-    (data, local_data) = rune::from_value(output)?;
-    println!("Start output: ({:?}, {:?})", data, local_data);
+    let mut data = structs::Data::new();
+    vm.call(["start"], (&mut data,))?;
     println!("Initialization time: {}us", init_elapsed.as_micros());
 
-    let mut update_times = vec![];
-
+    let mut rune_deltas = vec![];
+    let mut present_instant = Instant::now();
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -84,30 +81,35 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
         canvas.clear();
         canvas.present();
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / data.target_fps));
+
+        {
+            let elapsed = present_instant.elapsed();
+            data.busy_delta = elapsed.as_micros();
+            let max_frame_time = 1_000_000 / data.target_fps;
+            let sleep_time: i64 = max_frame_time as i64 - data.busy_delta as i64;
+            if sleep_time > 0 {
+                std::thread::sleep(Duration::from_micros(sleep_time as u64));
+            }
+            let full_elapsed = present_instant.elapsed();
+            data.delta = full_elapsed.as_micros();
+            data.fps = (1_000_000 / data.delta) as u32;
+        }
+        present_instant = Instant::now();
 
         let update_instant = Instant::now();
-        let output = vm.call(["update"], (data, local_data))?;
-        (data, local_data) = rune::from_value(output)?;
-        let update_elapsed = update_instant.elapsed();
-        update_times.push(update_elapsed);
-        if update_times.len() > 100 {
-            update_times.remove(0);
+        vm.call(["update"], (&mut data,))?;
+        data.rune_delta = update_instant.elapsed().as_micros();
+        rune_deltas.push(data.rune_delta);
+        if rune_deltas.len() > 100 {
+            rune_deltas.remove(0);
         }
         println!(
-            "Update output (.1): {:?}. In {}us ({}us)",
-            local_data,
-            update_elapsed.as_micros(),
-            update_times.iter().map(|x| x.as_micros()).sum::<u128>() / update_times.len() as u128
+            "Rune delta: {}us",
+            rune_deltas.iter().sum::<u128>() / rune_deltas.len() as u128
         );
         if data.exit {
             break 'running;
         }
-
-        // Adjust the window size
-        canvas
-            .window_mut()
-            .set_size(data.window_size.0, data.window_size.1)?;
     }
 
     Ok(())

@@ -1,4 +1,6 @@
-use rune::{Any, ContextError, Module};
+use once_cell::sync::Lazy;
+use rune::{Any, ContextError, Module, Value};
+use std::collections::HashMap;
 
 #[derive(Default, Debug, Clone, Any, PartialEq, Eq)]
 pub struct Data {
@@ -6,27 +8,68 @@ pub struct Data {
     pub delta: u128,
 
     #[rune(get)]
+    pub busy_delta: u128,
+
+    #[rune(get)]
+    pub rune_delta: u128,
+
+    #[rune(get)]
     pub fps: u32,
 
     #[rune(get, set)]
     pub target_fps: u32,
-
-    #[rune(get, set)]
-    pub window_size: (u32, u32),
 
     #[rune(set)]
     pub exit: bool,
 }
 
 impl Data {
-    #[rune::function(path = Self::new)]
     pub fn new() -> Self {
         Self {
             delta: 0,
+            busy_delta: 0,
+            rune_delta: 0,
             fps: 0,
             target_fps: 24,
-            window_size: (800, 600),
             exit: false,
+        }
+    }
+}
+
+type GlobalsType = HashMap<u64, Value>;
+
+static GLOBALS_PTR: Lazy<u64> = Lazy::new(|| {
+    let globals: GlobalsType = HashMap::new();
+    let ptr = Box::into_raw(Box::new(globals));
+    ptr as u64
+});
+
+#[rune::function]
+fn create_global(key: u64, value: Value) {
+    let globals = unsafe { &mut *(*GLOBALS_PTR as *mut GlobalsType) };
+    globals.insert(key, value);
+}
+
+#[rune::function]
+fn get_global(key: u64) -> Value {
+    let globals = unsafe { &mut *(*GLOBALS_PTR as *mut GlobalsType) };
+    match globals.get(&key) {
+        Some(value) => value.clone(),
+        None => {
+            eprintln!("Global not found: {}", key);
+            panic!();
+        }
+    }
+}
+
+#[rune::function]
+fn set_global(key: u64, value: Value) {
+    let globals = unsafe { &mut *(*GLOBALS_PTR as *mut GlobalsType) };
+    match globals.get_mut(&key) {
+        Some(v) => *v = value,
+        None => {
+            eprintln!("Global not found: {}", key);
+            panic!();
         }
     }
 }
@@ -34,6 +77,8 @@ impl Data {
 pub fn module() -> Result<Module, ContextError> {
     let mut module = Module::new();
     module.ty::<Data>()?;
-    module.function_meta(Data::new)?;
+    module.function_meta(create_global)?;
+    module.function_meta(get_global)?;
+    module.function_meta(set_global)?;
     Ok(module)
 }
