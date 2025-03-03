@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use rune::{Any, ContextError, Module, Value};
 use std::collections::HashMap;
 
-#[derive(Default, Debug, Clone, Any, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Any, PartialEq)]
 pub struct Data {
     #[rune(get)]
     pub delta: u128,
@@ -19,6 +19,15 @@ pub struct Data {
     #[rune(get, set)]
     pub target_fps: u32,
 
+    #[rune(get, set)]
+    pub clear_color_r: i64,
+
+    #[rune(get, set)]
+    pub clear_color_g: i64,
+
+    #[rune(get, set)]
+    pub clear_color_b: i64,
+
     #[rune(set)]
     pub exit: bool,
 }
@@ -31,6 +40,9 @@ impl Data {
             rune_delta: 0,
             fps: 0,
             target_fps: 24,
+            clear_color_r: 0,
+            clear_color_g: 0,
+            clear_color_b: 0,
             exit: false,
         }
     }

@@ -1,14 +1,20 @@
 mod structs;
 
 use rune::termcolor::{ColorChoice, StandardStream};
-use rune::{Context, ContextError, Diagnostics, Module, Source, Sources, Value, Vm};
+use rune::{Context, Diagnostics, Source, Sources, Vm};
 use sdl2::{event::Event, keyboard::Keycode, pixels::Color};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
 
-fn run() -> Result<(), Box<dyn std::error::Error>> {
+fn main_script_path() -> String {
+    let exe_dir = std::env::current_exe().unwrap();
+    let main_file = exe_dir.parent().unwrap().join("scripts").join("main.rn");
+    return main_file.to_str().unwrap().to_string();
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
 
@@ -21,8 +27,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
 
-    canvas.set_draw_color(Color::RGB(255, 0, 0));
-    canvas.clear();
     canvas.present();
     let mut event_pump = sdl_context.event_pump()?;
 
@@ -30,15 +34,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // VM
     let mut context = Context::with_default_modules()?;
-    let m = module()?;
-    context.install(m)?;
     let structs_module = structs::module()?;
     context.install(structs_module)?;
     let runtime = Arc::new(context.runtime()?);
 
     // Load source code
     let mut sources = Sources::new();
-    sources.insert(Source::new("main", include_str!("./script.rn"))?)?;
+    sources.insert(Source::from_path(main_script_path())?)?;
 
     let mut diagnostics = Diagnostics::new();
 
@@ -79,6 +81,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        canvas.set_draw_color(Color::RGB(
+            data.clear_color_r as u8,
+            data.clear_color_g as u8,
+            data.clear_color_b as u8,
+        ));
         canvas.clear();
         canvas.present();
 
@@ -113,21 +120,4 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
-}
-
-#[rune::function]
-fn atan2(a: f64, b: f64) -> f64 {
-    return a.atan2(b);
-}
-
-fn module() -> Result<Module, ContextError> {
-    let mut m = Module::with_item(["native"])?;
-    m.function_meta(atan2)?;
-    Ok(m)
-}
-
-fn main() {
-    if let Err(err) = run() {
-        eprintln!("error: {}", err);
-    }
 }
