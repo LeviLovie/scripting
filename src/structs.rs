@@ -1,6 +1,4 @@
-use once_cell::sync::Lazy;
-use rune::{Any, ContextError, Module, Value};
-use std::collections::HashMap;
+use rune::{Any, ContextError, Module};
 
 #[derive(Default, Debug, Clone, Any, PartialEq)]
 pub struct Data {
@@ -12,6 +10,9 @@ pub struct Data {
 
     #[rune(get)]
     pub rune_delta: u128,
+
+    #[rune(get)]
+    pub last_rune: u128,
 
     #[rune(get)]
     pub fps: u32,
@@ -38,6 +39,7 @@ impl Data {
             delta: 0,
             busy_delta: 0,
             rune_delta: 0,
+            last_rune: 0,
             fps: 0,
             target_fps: 24,
             clear_color_r: 0,
@@ -46,51 +48,18 @@ impl Data {
             exit: false,
         }
     }
-}
 
-type GlobalsType = HashMap<u64, Value>;
-
-static GLOBALS_PTR: Lazy<u64> = Lazy::new(|| {
-    let globals: GlobalsType = HashMap::new();
-    let ptr = Box::into_raw(Box::new(globals));
-    ptr as u64
-});
-
-#[rune::function]
-fn create_global(key: u64, value: Value) {
-    let globals = unsafe { &mut *(*GLOBALS_PTR as *mut GlobalsType) };
-    globals.insert(key, value);
-}
-
-#[rune::function]
-fn get_global(key: u64) -> Value {
-    let globals = unsafe { &mut *(*GLOBALS_PTR as *mut GlobalsType) };
-    match globals.get(&key) {
-        Some(value) => value.clone(),
-        None => {
-            eprintln!("Global not found: {}", key);
-            panic!();
-        }
-    }
-}
-
-#[rune::function]
-fn set_global(key: u64, value: Value) {
-    let globals = unsafe { &mut *(*GLOBALS_PTR as *mut GlobalsType) };
-    match globals.get_mut(&key) {
-        Some(v) => *v = value,
-        None => {
-            eprintln!("Global not found: {}", key);
-            panic!();
-        }
+    #[rune::function]
+    pub fn set_clear_color(&mut self, r: i64, g: i64, b: i64) {
+        self.clear_color_r = r;
+        self.clear_color_g = g;
+        self.clear_color_b = b;
     }
 }
 
 pub fn module() -> Result<Module, ContextError> {
     let mut module = Module::new();
     module.ty::<Data>()?;
-    module.function_meta(create_global)?;
-    module.function_meta(get_global)?;
-    module.function_meta(set_global)?;
+    module.function_meta(Data::set_clear_color)?;
     Ok(module)
 }

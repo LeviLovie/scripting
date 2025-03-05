@@ -1,57 +1,25 @@
-mod globals;
-mod local_data;
+mod color;
 
-pub fn start(data) {
+pub const GLOBAL_COLOR = 0;
+
+pub fn start(data, globals) {
     data.target_fps = 60;
-    create_global(globals::LOCAL_DATA, local_data::LocalData::new());
+    globals.set(GLOBAL_COLOR, color::Color::new(255, 255, 255, true));
 }
 
-pub fn update(data) {
-    let local_data = get_global(globals::LOCAL_DATA);
-    
-    local_data.inc();
-    if local_data.get_update_counter() > 100 {
-        local_data.clear();
-    }
+pub fn update(data, globals) {
+    let color = globals.get(GLOBAL_COLOR);
 
-    if local_data.increase_r {
-        data.clear_color_r = data.clear_color_r + 1;
-    } else {
-        data.clear_color_r = data.clear_color_r - 1;
-    }
-    if local_data.increase_g {
-        data.clear_color_g = data.clear_color_g + 2;
-    } else {
-        data.clear_color_g = data.clear_color_g - 2;
-    }
-    if local_data.increase_b {
-        data.clear_color_b = data.clear_color_b + 3;
-    } else {
-        data.clear_color_b = data.clear_color_b - 3;
-    }
-    if data.clear_color_r > 255 {
-        local_data.increase_r = false;
-        data.clear_color_r = 255;
-    } else if data.clear_color_r < 0 {
-        local_data.increase_r = true;
-        data.clear_color_r = 0;
-    }
-    if data.clear_color_g > 255 {
-        local_data.increase_g = false;
-        data.clear_color_g = 255;
-    } else if data.clear_color_g < 0 {
-        local_data.increase_g = true;
-        data.clear_color_g = 0;
-    }
-    if data.clear_color_b > 255 {
-        local_data.increase_b = false;
-        data.clear_color_b = 255;
-    } else if data.clear_color_b < 0 {
-        local_data.increase_b = true;
-        data.clear_color_b = 0;
-    }
+    color.add(
+        random_range_int(1, 4),
+        -random_range_int(2, 4),
+        random_range_int(1, 3)
+    );
+    data.clear_color_r = color.get_r();
+    data.clear_color_g = color.get_g();
+    data.clear_color_b = color.get_b();
 
-    dbg!(`LocalData.counter: ${local_data.update_counter}, target: ${data.target_fps}, fps: ${data.fps}, delta: ${data.delta}, busy_delta: ${data.busy_delta}, rune_delta: ${data.rune_delta}`);
+    globals.set(GLOBAL_COLOR, color);
 
-    set_global(globals::LOCAL_DATA, local_data);
+    dbg!(`Rune delta: ${data.rune_delta}, last rune delta: ${data.last_rune}, target fps: ${data.target_fps}, fps: ${data.fps}`);
 }

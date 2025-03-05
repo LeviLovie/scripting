@@ -1,7 +1,9 @@
+mod globals;
 mod structs;
 
+use rand::Rng;
 use rune::termcolor::{ColorChoice, StandardStream};
-use rune::{Context, Diagnostics, Source, Sources, Vm};
+use rune::{Context, ContextError, Diagnostics, Module, Source, Sources, Vm};
 use sdl2::{event::Event, keyboard::Keycode, pixels::Color};
 use std::{
     sync::Arc,
@@ -34,8 +36,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // VM
     let mut context = Context::with_default_modules()?;
-    let structs_module = structs::module()?;
-    context.install(structs_module)?;
+    context.install(structs::module()?)?;
+    context.install(globals::module()?)?;
+    context.install(module()?)?;
     let runtime = Arc::new(context.runtime()?);
 
     // Load source code
@@ -64,7 +67,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Call the start function
     let mut data = structs::Data::new();
-    vm.call(["start"], (&mut data,))?;
+    let mut globals = globals::Globals::new();
+    vm.call(["start"], (&mut data, &mut globals))?;
     println!("Initialization time: {}us", init_elapsed.as_micros());
 
     let mut rune_deltas = vec![];
@@ -104,20 +108,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         present_instant = Instant::now();
 
         let update_instant = Instant::now();
-        vm.call(["update"], (&mut data,))?;
-        data.rune_delta = update_instant.elapsed().as_micros();
-        rune_deltas.push(data.rune_delta);
+        vm.call(["update"], (&mut data, &mut globals))?;
+        rune_deltas.push(update_instant.elapsed().as_micros());
+        data.last_rune = rune_deltas[rune_deltas.len() - 1];
         if rune_deltas.len() > 100 {
             rune_deltas.remove(0);
         }
-        println!(
-            "Rune delta: {}us",
-            rune_deltas.iter().sum::<u128>() / rune_deltas.len() as u128
-        );
+        data.rune_delta = rune_deltas.iter().sum::<u128>() / rune_deltas.len() as u128;
         if data.exit {
             break 'running;
         }
     }
 
     Ok(())
+}
+
+#[rune::function]
+fn random_range_int(min: i64, max: i64) -> i64 {
+    rand::rng().random_range(min..max)
+}
+
+fn module() -> Result<Module, ContextError> {
+    let mut module = Module::new();
+    module.function_meta(random_range_int)?;
+    Ok(module)
 }
